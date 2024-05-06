@@ -6,7 +6,11 @@ import torchvision.transforms as transforms
 
 def load_mnist_dataset(train: Optional[bool] = True):
     ds = torchvision.datasets.MNIST(
-        '~/dataset', train=train, transform=transforms.ToTensor()
+        '~/dataset', train=train,
+        transform=transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Lambda(lambda x: 2 * x - 1),
+        ])
     )
     return ds
   
