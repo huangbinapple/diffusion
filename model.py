@@ -27,8 +27,9 @@ class DiffusionRunner:
     def noise(self, x, noise_level:torch.Tensor) -> torch.Tensor:
         """x has shape (B, C, H, W)"""
         assert x.size(0) == noise_level.size(0)
-        return x +\
-            torch.randn_like(x) * noise_level.reshape(x.size(0), 1, 1, 1)
+        noise = torch.randn_like(x)
+        noise_level = noise_level.reshape(x.size(0), 1, 1, 1)
+        return torch.sqrt(noise_level) * noise + torch.sqrt(1 - noise_level) * x
             
     def evaluate(self, x, noise_level):
         """x has shape of (B, C, H, W)"""
