@@ -13,7 +13,7 @@ def main():
     unet = module.UNet(noise_dim=32).to('cuda:0')
     print(unet)
     checkpoint_manager = utils.CheckPointManager(
-        'checkpoint3', high_is_better=False)
+        'checkpoint5', high_is_better=False)
     runner = model.DiffusionRunner(unet)
     n_params =\
         sum(p.numel() for p in unet.parameters() if p.requires_grad)
@@ -33,15 +33,9 @@ def main():
         
         if n_iter % eval_interval == 0:
             print("Evaluating...")
-            noise_level_to_test = (0.1, 0.3, 0.5, 0.7, 0.9)
-            costs = torch.zeros(len(noise_level_to_test))
-            for batch in tqdm.tqdm(test_loader):
-                image_tensor, label = batch
-                for i, noise_level in enumerate(noise_level_to_test):
-                    costs[i] += runner.evaluate(
-                        image_tensor.to('cuda:0'), noise_level).cpu()
-            costs = costs / len(test_loader)
-            score = costs.mean().item()
+            evaluate_result = runner.evaluate(test_loader)
+            score = evaluate_result['score']
+            costs = evaluate_result['costs']
             checkpoint_manager.store_checkpoint(runner, n_iter, score)
             print(f'After {n_iter + 1: 5} epoch, average validation cost: ' +\
                 ' '.join([f'{cost:.3f}' for cost in costs]) +\
