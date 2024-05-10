@@ -1,10 +1,13 @@
 import torch
 from torch import nn
+import utils
 
 
 class DiffusionRunner:
     def __init__(self, model):
         self.model = model
+        self.checkpoint_manager = utils.CheckPointManager(
+            'checkpoint5', high_is_better=False)
         # Init a adam optimizer
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
         # Init a MSE loss function
@@ -44,7 +47,7 @@ class DiffusionRunner:
             cost = cost_mean_of_sample.sum()
         return cost
 
-    def evaluate(self, test_loader) -> int:
+    def evaluate(self, test_loader, n_iter) -> int:
         noise_level_to_test = (0.1, 0.3, 0.5, 0.7, 0.9)
         costs = torch.zeros(len(noise_level_to_test))
         for batch in test_loader:
@@ -54,6 +57,7 @@ class DiffusionRunner:
                     image_tensor.to('cuda:0'), noise_level).cpu()
         costs = costs / len(test_loader)
         score = costs.mean().item()
+        self.checkpoint_manager.store_checkpoint(self, n_iter, score)
         return {'score': score, 'costs': costs}
     
     def compute_cost(self, x, gt):

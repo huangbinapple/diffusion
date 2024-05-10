@@ -1,19 +1,14 @@
 from typing import Optional
 import tqdm
 
-import torch
-
 import data
 import module
 import model
-import utils
 
     
 def main():
     unet = module.UNet(noise_dim=32).to('cuda:0')
     print(unet)
-    checkpoint_manager = utils.CheckPointManager(
-        'checkpoint5', high_is_better=False)
     runner = model.DiffusionRunner(unet)
     n_params =\
         sum(p.numel() for p in unet.parameters() if p.requires_grad)
@@ -33,10 +28,9 @@ def main():
         
         if n_iter % eval_interval == 0:
             print("Evaluating...")
-            evaluate_result = runner.evaluate(test_loader)
+            evaluate_result = runner.evaluate(test_loader, n_iter)
             score = evaluate_result['score']
             costs = evaluate_result['costs']
-            checkpoint_manager.store_checkpoint(runner, n_iter, score)
             print(f'After {n_iter + 1: 5} epoch, average validation cost: ' +\
                 ' '.join([f'{cost:.3f}' for cost in costs]) +\
                 f', score: {score:.3f}')
