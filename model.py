@@ -1,9 +1,21 @@
 import torch
 from torch import nn
 import utils
+from abc import ABC, abstractmethod
 
 
-class DiffusionRunner:
+class Runner(ABC):
+    
+    @abstractmethod
+    def train_step(self):
+        pass
+    
+    @abstractmethod
+    def evaluate(self):
+        pass
+
+
+class DiffusionRunner(Runner):
     def __init__(self, model):
         self.model = model
         self.checkpoint_manager = utils.CheckPointManager(
