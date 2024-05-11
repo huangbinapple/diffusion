@@ -5,7 +5,7 @@ from einops.layers.torch import Rearrange
 
 class UNet(nn.Module):
     def __init__(self, noise_dim:int=128):
-        super(UNet, self).__init__()
+        super().__init__()
         # Downsample
         self.conv1 = nn.Conv2d(1, 8, kernel_size=3, padding=1)
         self.downsample1 = nn.Conv2d(8, 8, kernel_size=2, stride=2)
