@@ -7,11 +7,11 @@ from abc import ABC, abstractmethod
 class Runner(ABC):
     
     @abstractmethod
-    def train_step(self):
+    def train_step(self, x):
         pass
     
     @abstractmethod
-    def evaluate(self):
+    def evaluate(self, test_loader):
         pass
 
 
