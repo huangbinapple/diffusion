@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import tqdm
 import utils
 from abc import ABC, abstractmethod
 
@@ -38,6 +39,15 @@ class DiffusionRunner(Runner):
         cost.backward()
         self.optimizer.step()
         return cost
+    
+    def train(self, train_loader, n_iter):
+        cost = 0
+        for batch in tqdm.tqdm(train_loader):
+            image_tensor, label = batch
+            cost += self.train_step(
+                image_tensor.to('cuda:0'))
+        print(f'After {n_iter + 1: 5} epoch, average cost: '
+              f'{cost / len(train_loader):.3f}')
         
     def noise(self, x, noise_level:torch.Tensor) -> torch.Tensor:
         """x has shape (B, C, H, W)"""
@@ -59,7 +69,7 @@ class DiffusionRunner(Runner):
             cost = cost_mean_of_sample.sum()
         return cost
 
-    def evaluate(self, test_loader, n_iter) -> int:
+    def evaluate(self, test_loader, n_iter):
         noise_level_to_test = (0.1, 0.3, 0.5, 0.7, 0.9)
         costs = torch.zeros(len(noise_level_to_test))
         for batch in test_loader:
@@ -70,7 +80,9 @@ class DiffusionRunner(Runner):
         costs = costs / len(test_loader)
         score = costs.mean().item()
         self.checkpoint_manager.store_checkpoint(self, n_iter, score)
-        return {'score': score, 'costs': costs}
+        print(f'After {n_iter + 1: 5} epoch, average validation cost: ' +\
+            ' '.join([f'{cost:.3f}' for cost in costs]) +\
+            f', score: {score:.3f}')
     
     def compute_cost(self, x, gt):
         return self.loss(x, gt)

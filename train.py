@@ -1,5 +1,5 @@
 from typing import Optional
-import tqdm
+
 
 import data
 import module
@@ -19,21 +19,10 @@ def main():
         data.get_loader(train=True), data.get_loader(train=False)
     eval_interval = 10
     for n_iter in range(1000):
-        cost = 0
-        for batch in tqdm.tqdm(train_loader):
-            image_tensor, label = batch
-            cost += runner.train_step(image_tensor.to('cuda:0'))
-        print(f'After {n_iter + 1: 5} epoch, average cost: '
-              f'{cost / len(train_loader):.3f}')
-        
+        runner.train(train_loader, n_iter)
         if n_iter % eval_interval == 0:
             print("Evaluating...")
-            evaluate_result = runner.evaluate(test_loader, n_iter)
-            score = evaluate_result['score']
-            costs = evaluate_result['costs']
-            print(f'After {n_iter + 1: 5} epoch, average validation cost: ' +\
-                ' '.join([f'{cost:.3f}' for cost in costs]) +\
-                f', score: {score:.3f}')
+            runner.evaluate(test_loader, n_iter)
 
 
 if __name__ == '__main__':
