@@ -47,7 +47,7 @@ class DiffusionRunner(Runner):
             loss += self.train_step(
                 image_tensor.to('cuda:0'))
         print(f'After {n_iter + 1: 5} epoch, average loss: '
-              f'{loss / len(train_loader):.3f}')
+              f'{loss / len(train_loader.dataset):.3f}')
         
     def noise(self, x, noise_level:torch.Tensor) -> torch.Tensor:
         """x has shape (B, C, H, W)"""
@@ -77,7 +77,7 @@ class DiffusionRunner(Runner):
             for i, noise_level in enumerate(noise_level_to_test):
                 losss[i] += self.evaluate_step(
                     image_tensor.to('cuda:0'), noise_level).cpu()
-        losss = losss / len(test_loader)
+        losss = losss / len(test_loader.dataset)
         score = losss.mean().item()
         self.checkpoint_manager.store_checkpoint(self, n_iter, score)
         print(f'After {n_iter + 1: 5} epoch, average validation loss: ' +\
@@ -115,7 +115,7 @@ class ClassifierRunner(Runner):
             loss += self.train_step(
                 image_tensor.to('cuda:0'), label.to('cuda:0'))
         print(f'After {n_iter + 1: 5} epoch, average loss: '
-              f'{loss / len(dataloader):.3f}')
+              f'{loss / len(dataloader.dataset):.3f}')
     
     def evaluate_step(self, x, y):
         """x has shape of (B, C, H, W)"""
