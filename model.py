@@ -56,7 +56,7 @@ class DiffusionRunner(Runner):
         noise_level = noise_level.reshape(x.size(0), 1, 1, 1)
         return torch.sqrt(noise_level) * noise + torch.sqrt(1 - noise_level) * x
             
-    def evaluate_on_samples(self, x, noise_level):
+    def evaluate_step(self, x, noise_level):
         """x has shape of (B, C, H, W)"""
         self.model.eval()
         with torch.no_grad():
@@ -75,7 +75,7 @@ class DiffusionRunner(Runner):
         for batch in test_loader:
             image_tensor, label = batch
             for i, noise_level in enumerate(noise_level_to_test):
-                costs[i] += self.evaluate_on_samples(
+                costs[i] += self.evaluate_step(
                     image_tensor.to('cuda:0'), noise_level).cpu()
         costs = costs / len(test_loader)
         score = costs.mean().item()
