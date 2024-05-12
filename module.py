@@ -72,3 +72,38 @@ class UNet(nn.Module):
         x = self.relu(x)
         x = self.conv6(x) + x_28 # (B, 1, 28, 28)
         return x
+    
+    
+class CNN(nn.Module):
+    def __init__(self):
+        super().__init__()
+        # Downsample
+        self.conv1 = nn.Conv2d(1, 8, kernel_size=3, padding=1)
+        self.downsample1 = nn.Conv2d(8, 8, kernel_size=2, stride=2)
+        self.conv2 = nn.Conv2d(8, 32, kernel_size=3, padding=2)
+        self.downsample2 = nn.Conv2d(32, 32, kernel_size=2, stride=2)
+        self.conv3 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.downsample3 = nn.Conv2d(64, 128, kernel_size=2, stride=2)
+        self.conv4 = nn.Conv2d(128, 256, kernel_size=4)
+        self.output = nn.Linear(256, 10)
+        # Relu
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        x = self.conv1(x)  # (B, 8, 28, 28)
+        x = self.relu(x)
+        x = self.downsample1(x)  # (B, 8, 14, 14)
+        x = self.relu(x)
+        x = self.conv2(x)  # (B, 32, 16, 16)
+        x = self.relu(x)
+        x = self.downsample2(x)  # (B, 32, 8, 8)
+        x = self.relu(x)
+        x = self.conv3(x)  # (B, 64, 8, 8)
+        x = self.relu(x)
+        x = self.downsample3(x)  # (B, 128, 4, 4)
+        x = self.relu(x)
+        x = self.conv4(x)  # (B, 256, 1, 1)
+        x = self.relu(x)
+        x = x.squeeze(2, 3)  # (B, 256)
+        logits = self.output(x)  # (B, 10)
+        return logits
