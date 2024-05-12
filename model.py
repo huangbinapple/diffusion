@@ -92,8 +92,7 @@ class ClassifierRunner(Runner):
     
     def __init__(self, model) -> None:
         self.model = model
-        self.checkpoint_manager = utils.CheckPointManager(
-            'checkpoint5', high_is_better=False)
+        self.checkpoint_manager = utils.CheckPointManager('checkpoint5')
         # Init a adam optimizer
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
         # Init a MSE loss function
@@ -121,21 +120,26 @@ class ClassifierRunner(Runner):
         """x has shape of (B, C, H, W)"""
         self.model.eval()
         with torch.no_grad():
-            y_predict = self.model(x)
-            loss = self.compute_loss(y_predict, y)  # ()
-        return loss
+            logits = self.model(x)  # (B, 10)
+            loss = self.compute_loss(logits, y)  # ()
+            y_predict = logits.argmax(dim=1)  # (B,)
+            n_correct = (y_predict == y).sum() # ()
+        return {'loss': loss, 'n_correct': n_correct}
     
     def evaluate(self, test_loader, n_iter) -> dict:
-        loss = 0
+        loss, n_correct = 0, 0
         for batch in test_loader:
             image_tensor, label = batch
-            loss += self.evaluate_step(
-                image_tensor.to('cuda:0'), label.to('cuda:0')).cpu()
-        score = loss / len(test_loader)    
+            eval_result = self.evaluate_step(
+                image_tensor.to('cuda:0'), label.to('cuda:0'))
+            loss += eval_result['loss']
+            n_correct += eval_result['n_correct']
+        loss = loss / len(test_loader.dataset)  
+        acc = n_correct / len(test_loader.dataset)
+        score = acc * 100
         self.checkpoint_manager.store_checkpoint(self, n_iter, score)
         print(f'After {n_iter + 1: 5} epoch, '
-              f'average validation loss: {score:.3f}')
+              f'average validation loss: {loss:.3f}, acc: {score:.3f}')
 
-    
     def compute_loss(self, x, gt):
         return self.loss(x, gt)
