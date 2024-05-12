@@ -33,21 +33,21 @@ class DiffusionRunner(Runner):
         original_x = x
         noised_x = self.noise(x, noise_level)
         x = self.model(noised_x, noise_level)
-        cost = self.compute_cost(x, original_x)  # (B, C, H, W)
-        cost_mean_of_sample = cost.mean(dim=(1, 2, 3))
-        cost = cost_mean_of_sample.sum()
-        cost.backward()
+        loss = self.compute_loss(x, original_x)  # (B, C, H, W)
+        loss_mean_of_sample = loss.mean(dim=(1, 2, 3))
+        loss = loss_mean_of_sample.sum()
+        loss.backward()
         self.optimizer.step()
-        return cost
+        return loss
     
     def train(self, train_loader, n_iter):
-        cost = 0
+        loss = 0
         for batch in tqdm.tqdm(train_loader):
             image_tensor, label = batch
-            cost += self.train_step(
+            loss += self.train_step(
                 image_tensor.to('cuda:0'))
-        print(f'After {n_iter + 1: 5} epoch, average cost: '
-              f'{cost / len(train_loader):.3f}')
+        print(f'After {n_iter + 1: 5} epoch, average loss: '
+              f'{loss / len(train_loader):.3f}')
         
     def noise(self, x, noise_level:torch.Tensor) -> torch.Tensor:
         """x has shape (B, C, H, W)"""
@@ -64,25 +64,78 @@ class DiffusionRunner(Runner):
             original_x = x
             noised_x = self.noise(x, noise_level)
             x = self.model(noised_x, noise_level)
-            cost = self.compute_cost(x, original_x)  # (B, C, H, W)
-            cost_mean_of_sample = cost.mean(dim=(1, 2, 3))
-            cost = cost_mean_of_sample.sum()
-        return cost
+            loss = self.compute_loss(x, original_x)  # (B, C, H, W)
+            loss_mean_of_sample = loss.mean(dim=(1, 2, 3))
+            loss = loss_mean_of_sample.sum()
+        return loss
 
     def evaluate(self, test_loader, n_iter):
         noise_level_to_test = (0.1, 0.3, 0.5, 0.7, 0.9)
-        costs = torch.zeros(len(noise_level_to_test))
+        losss = torch.zeros(len(noise_level_to_test))
         for batch in test_loader:
             image_tensor, label = batch
             for i, noise_level in enumerate(noise_level_to_test):
-                costs[i] += self.evaluate_step(
+                losss[i] += self.evaluate_step(
                     image_tensor.to('cuda:0'), noise_level).cpu()
-        costs = costs / len(test_loader)
-        score = costs.mean().item()
+        losss = losss / len(test_loader)
+        score = losss.mean().item()
         self.checkpoint_manager.store_checkpoint(self, n_iter, score)
-        print(f'After {n_iter + 1: 5} epoch, average validation cost: ' +\
-            ' '.join([f'{cost:.3f}' for cost in costs]) +\
+        print(f'After {n_iter + 1: 5} epoch, average validation loss: ' +\
+            ' '.join([f'{loss:.3f}' for loss in losss]) +\
             f', score: {score:.3f}')
     
-    def compute_cost(self, x, gt):
+    def compute_loss(self, x, gt):
+        return self.loss(x, gt)
+    
+
+class ClassifierRunner(Runner):
+    
+    def __init__(self, model) -> None:
+        self.model = model
+        self.checkpoint_manager = utils.CheckPointManager(
+            'checkpoint5', high_is_better=False)
+        # Init a adam optimizer
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
+        # Init a MSE loss function
+        self.loss = nn.CrossEntropyLoss(reduction='sum')
+    
+    def train_step(self, x, y):
+        self.model.train()
+        self.optimizer.zero_grad()
+        y_predict = self.model(x)
+        loss = self.compute_loss(y_predict, y)  # ()
+        loss.backward()
+        self.optimizer.step()
+        return loss
+    
+    def train(self, dataloader, n_iter):
+        loss = 0
+        for batch in tqdm.tqdm(dataloader):
+            image_tensor, label = batch
+            loss += self.train_step(
+                image_tensor.to('cuda:0'), label.to('cuda:0'))
+        print(f'After {n_iter + 1: 5} epoch, average loss: '
+              f'{loss / len(dataloader):.3f}')
+    
+    def evaluate_step(self, x, y):
+        """x has shape of (B, C, H, W)"""
+        self.model.eval()
+        with torch.no_grad():
+            y_predict = self.model(x)
+            loss = self.compute_loss(y_predict, y)  # ()
+        return loss
+    
+    def evaluate(self, test_loader, n_iter) -> dict:
+        loss = 0
+        for batch in test_loader:
+            image_tensor, label = batch
+            loss += self.evaluate_step(
+                image_tensor.to('cuda:0'), label.to('cuda:0')).cpu()
+        score = loss / len(test_loader)    
+        self.checkpoint_manager.store_checkpoint(self, n_iter, score)
+        print(f'After {n_iter + 1: 5} epoch, '
+              f'average validation loss: {score:.3f}')
+
+    
+    def compute_loss(self, x, gt):
         return self.loss(x, gt)
