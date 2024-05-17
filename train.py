@@ -7,11 +7,13 @@ import model
 
     
 def main():
-    unet = module.UNet(noise_dim=32).to('cuda:0')
-    print(unet)
-    runner = model.DiffusionRunner(unet)
+    model_ = module.UNet(noise_dim=32).to('cuda:0')
+    runner = model.DiffusionRunner(model_)
+    # model_ = module.CNN().to('cuda:0')
+    # runner = model.ClassifierRunner(model_)
+    print(model_)
     n_params =\
-        sum(p.numel() for p in unet.parameters() if p.requires_grad)
+        sum(p.numel() for p in model_.parameters() if p.requires_grad)
         
     print(f'{n_params = }')
     
