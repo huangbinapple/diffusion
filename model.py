@@ -101,8 +101,8 @@ class ClassifierRunner(Runner):
     def train_step(self, x, y):
         self.model.train()
         self.optimizer.zero_grad()
-        y_predict = self.model(x)
-        loss = self.compute_loss(y_predict, y)  # ()
+        logits = self.model(x)
+        loss = self.compute_loss(logits, y)  # ()
         loss.backward()
         self.optimizer.step()
         return loss
