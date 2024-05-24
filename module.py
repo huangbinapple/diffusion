@@ -4,6 +4,7 @@ from einops.layers.torch import Rearrange
 
 
 class UNet(nn.Module):
+    N_LABEL = 10
     def __init__(self, noise_dim:int=128):
         super().__init__()
         # Downsample
@@ -25,50 +26,67 @@ class UNet(nn.Module):
         # Noise related
         self.noise_dim = noise_dim
         self.noise_injections = nn.ModuleDict()
+        self.label_injections = nn.ModuleDict()
         for i in (28, 16, 8, 4):
             self.noise_injections[f'{i}'] = nn.Sequential(
                 nn.Linear(noise_dim, i * i),
                 Rearrange('B (i j) -> B 1 i j', i=i, j=i)
             )
+            self.label_injections[f'{i}'] = nn.Sequential(
+                nn.Linear(self.N_LABEL, i * i),
+                Rearrange('B (i j) -> B 1 i j', i=i, j=i)
+            )
         
     def encode_noise_level(
-            self, noise_level:float, device='cpu') -> None:
+            self, noise_level:float, device='cpu'):
         """Encode noise level into a one-hot representation"""
         batch_size = noise_level.size(0)
         result = torch.zeros(batch_size, self.noise_dim, device=device)
         result[range(batch_size), (noise_level * self.noise_dim).long()] = 1
         return result
     
-    def forward(self, x, noise_level:torch.Tensor):
+    def encode_label(self, label):
+        """Encode label into a one-hot representation"""
+        batch_size = label.size(0)
+        result = torch.zeros(batch_size, self.N_LABEL, device=label.device)
+        result[range(batch_size), label] = 1
+        return result
+    
+    def forward(self, x, noise_level:torch.Tensor, label:torch.Tensor=None):
         noise_onehot = self.encode_noise_level(noise_level, device=x.device)
-        noise_embedding = {
-            i: self.noise_injections[f'{i}'](noise_onehot)
-            for i in (28, 16, 8, 4)
-        }
+        conditioning_embedding = {}
+        for i in (28, 16, 8, 4):
+            conditioning_embedding[i] =\
+                self.noise_injections[f'{i}'](noise_onehot)
+            if label is not None:
+                label_onehot = self.encode_label(label)
+                conditioning_embedding[i] +=\
+                    self.label_injections[f'{i}'](label_onehot)
+
         # Downsample
         x_28 = x  # (B, 1, 28, 28)
-        x = self.conv1(x) + noise_embedding[28]  # (B, 8, 28, 28)
+        x = self.conv1(x) + conditioning_embedding[28]  # (B, 8, 28, 28)
         x = self.relu(x)
         x = self.downsample1(x) # (B, 8, 14, 14)
         x = self.relu(x)
-        x_16 = x = self.conv2(x) + noise_embedding[16]  # (B, 32, 16, 16)
+        x_16 = x = self.conv2(x) + conditioning_embedding[16]  # (B, 32, 16, 16)
         x = self.relu(x)
         x = self.downsample2(x) # (B, 32, 8, 8)
         x = self.relu(x)
-        x_8 = x = self.conv3(x) + noise_embedding[8] # (B, 64, 8, 8)
+        x_8 = x = self.conv3(x) + conditioning_embedding[8] # (B, 64, 8, 8)
         x = self.relu(x)
-        x = self.downsample3(x) + noise_embedding[4] # (B, 128, 4, 4)
+        x = self.downsample3(x) + conditioning_embedding[4] # (B, 128, 4, 4)
         x = self.relu(x)
         # Upsample
-        x = self.upsample1(x) + x_8 + noise_embedding[8] # (B, 64, 8, 8)
+        x = self.upsample1(x) + x_8 + conditioning_embedding[8] # (B, 64, 8, 8)
         x = self.relu(x)
         x = self.conv4(x) # (B, 32, 8, 8)
         x = self.relu(x)
-        x = self.upsample2(x) + x_16 + noise_embedding[16] # (B, 32, 16, 16)
+        x = self.upsample2(x) + x_16 + conditioning_embedding[16] # (B, 32, 16, 16)
         x = self.relu(x)
         x = self.conv5(x) # (B, 8, 14, 14)
         x = self.relu(x)
-        x = self.upsample3(x) + noise_embedding[28] # (B, 8, 28, 28)
+        x = self.upsample3(x) + conditioning_embedding[28] # (B, 8, 28, 28)
         x = self.relu(x)
         x = self.conv6(x) + x_28 # (B, 1, 28, 28)
         return x

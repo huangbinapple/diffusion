@@ -20,19 +20,19 @@ class DiffusionRunner(Runner):
     def __init__(self, model):
         self.model = model
         self.checkpoint_manager = utils.CheckPointManager(
-            'checkpoint5', high_is_better=False)
+            'checkpoint6', high_is_better=False)
         # Init a adam optimizer
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
         # Init a MSE loss function
         self.loss = nn.MSELoss(reduction='none')
     
-    def train_step(self, x):
+    def train_step(self, x, label):
         self.model.train()
         self.optimizer.zero_grad()
         noise_level = torch.rand(x.size(0), device=x.device)
         original_x = x
         noised_x = self.noise(x, noise_level)
-        x = self.model(noised_x, noise_level)
+        x = self.model(noised_x, noise_level, label)
         loss = self.compute_loss(x, original_x)  # (B, C, H, W)
         loss_mean_of_sample = loss.mean(dim=(1, 2, 3))
         loss = loss_mean_of_sample.sum()
@@ -45,7 +45,7 @@ class DiffusionRunner(Runner):
         for batch in tqdm.tqdm(train_loader):
             image_tensor, label = batch
             loss += self.train_step(
-                image_tensor.to('cuda:0'))
+                image_tensor.to('cuda:0'), label.to('cuda:0'))
         print(f'After {n_iter + 1: 5} epoch, average loss: '
               f'{loss / len(train_loader.dataset):.3f}')
         
